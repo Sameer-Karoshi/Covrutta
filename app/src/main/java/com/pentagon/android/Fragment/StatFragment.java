@@ -60,7 +60,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
-
 import static android.Manifest.permission.READ_EXTERNAL_STORAGE;
 import static android.Manifest.permission.WRITE_EXTERNAL_STORAGE;
 
@@ -73,9 +72,9 @@ public class StatFragment extends Fragment implements OnChartGestureListener, On
     private LineChart mChart;
     private Spinner mState, mGender, mAge;
     private TextView mTotal, mDeceased;
+    private Button mDownload, mShare;
     private Button mFilter;
     public String FileName;
-
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
@@ -90,20 +89,8 @@ public class StatFragment extends Fragment implements OnChartGestureListener, On
         mTotal = v.findViewById(R.id.fs_total);
         mDeceased = v.findViewById(R.id.fs_deceased);
         mFilter = v.findViewById(R.id.fs_filter);
-
-        Button mDownload = v.findViewById(R.id.fs_download);
-        ActivityCompat.requestPermissions((Activity) getContext(),new String[]{WRITE_EXTERNAL_STORAGE,READ_EXTERNAL_STORAGE}, PackageManager.PERMISSION_GRANTED);
-        StrictMode.VmPolicy.Builder builder = new StrictMode.VmPolicy.Builder();
-        StrictMode.setVmPolicy(builder.build());
-        mDownload.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                TakeScreenshot();
-
-                Toast.makeText(getContext(),"Downloaded",Toast.LENGTH_SHORT).show();
-            }
-        });
-
+        mDownload = v.findViewById(R.id.fs_download);
+        mShare = v.findViewById(R.id.fs_share);
         mFilter.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -112,6 +99,10 @@ public class StatFragment extends Fragment implements OnChartGestureListener, On
         });
         mTotal.setTextColor(Color.BLUE);
         mDeceased.setTextColor(Color.GRAY);
+        jsonParseCases("https://api.jsonbin.io/b/5f5e5a4b7243cd7e823b7764/1");
+        ActivityCompat.requestPermissions((Activity) getContext(),new String[]{WRITE_EXTERNAL_STORAGE,READ_EXTERNAL_STORAGE}, PackageManager.PERMISSION_GRANTED);
+        StrictMode.VmPolicy.Builder builder = new StrictMode.VmPolicy.Builder();
+        StrictMode.setVmPolicy(builder.build());
         mTotal.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -130,16 +121,36 @@ public class StatFragment extends Fragment implements OnChartGestureListener, On
                 jsonParseCases("https://api.jsonbin.io/b/5f5f184dad23b57ef911d4de");
             }
         });
-        jsonParseCases("https://api.jsonbin.io/b/5f5e5a4b7243cd7e823b7764/1");
+        mDownload.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                File pdf = DownloadActivity();
+                Intent intent = new Intent(Intent.ACTION_VIEW);
+                intent.setDataAndType(Uri.fromFile(pdf), "application/pdf");
+                intent.setFlags(Intent.FLAG_ACTIVITY_NO_HISTORY);
+                startActivity(intent);
+            }
+        });
+        mShare.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                ShareActivity(DownloadActivity().getPath());
+            }
+        });
         return v;
-
-
-
     }
-    public void TakeScreenshot(){
 
+    private void ShareActivity(String pdfPath) {
+        File pdf = new File(pdfPath);
+        Uri uri = Uri.fromFile(pdf);
+        Intent share = new Intent();
+        share.setAction(Intent.ACTION_SEND);
+        share.setType("application/pdf");
+        share.putExtra(Intent.EXTRA_STREAM, uri);
+        startActivity(share);
+    }
 
-
+    private File DownloadActivity() {
         Date date = new Date();
         CharSequence now = android.text.format.DateFormat.format("yyyy-MM-dd_hh:mm:ss",date);
         String filename = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES)  + "/Covrutta/" + now + ".jpg";
@@ -158,24 +169,12 @@ public class StatFragment extends Fragment implements OnChartGestureListener, On
             bitmap.compress(Bitmap.CompressFormat.JPEG,100,fileOutputStream);
             fileOutputStream.flush();
             fileOutputStream.close();
-
-            Uri uri = Uri.fromFile(file);
-            Intent intent = new Intent(Intent.ACTION_VIEW);
-            intent.setDataAndType(uri,"image/jpeg");
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            this.startActivity(intent);
-
-
-
         } catch (FileNotFoundException e) {
-            e.printStackTrace();
+            Log.d(TAG, "DownloadActivity: FileNotFoundException: " + e.getMessage());
         } catch (IOException e) {
-            e.printStackTrace();
+            Log.d(TAG, "DownloadActivity: IOException: " + e.getMessage());
         }
-
-
         //PDF
-        //String new_filename = Directory + now + ".jpg";
         Bitmap bitmap1 = BitmapFactory.decodeFile(filename);
         PdfDocument pdfDocument = new PdfDocument();
         PdfDocument.PageInfo myPageInfo = new PdfDocument.PageInfo.Builder(1080,2160,1).create();
@@ -185,18 +184,14 @@ public class StatFragment extends Fragment implements OnChartGestureListener, On
         pdfDocument.finishPage(page);
 
         String pdfFile = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES)  + "/Covrutta/" + now + ".pdf";
-        File MyPdfFile = new File(pdfFile);
+        File newPDF = new File(pdfFile);
         try {
-            pdfDocument.writeTo(new FileOutputStream(MyPdfFile));
+            pdfDocument.writeTo(new FileOutputStream(newPDF));
         } catch (IOException e) {
-            e.printStackTrace();
+            Log.d(TAG, "DownloadActivity: IOException: " + e.getMessage());
         }
-
         pdfDocument.close();
-
-
-
-
+        return newPDF;
     }
 
     private void filterActivity() {
